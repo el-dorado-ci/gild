@@ -1,0 +1,4 @@
+# Local
+.direnv/
+.docker.volumes/
+*.tmp
