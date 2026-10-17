@@ -20,7 +20,7 @@ jobs:
 
       # The hooks are `language: system`, so they run whatever cargo, rustfmt
       # and clippy the dev shell provides - the same versions used locally.
-      - uses: cachix/install-nix-action@v27
+      - uses: cachix/install-nix-action@v29
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
