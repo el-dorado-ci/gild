@@ -1,0 +1,2 @@
+bump_type: patch
+description: Changing the Renovate config from invalid field name `prHourlyRate` to `prHourlyLimit`

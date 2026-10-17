@@ -7,7 +7,7 @@
     "at any time"
   ],
   "prConcurrentLimit": 0,
-  "prHourlyRate": 0,
+  "prHourlyLimit": 0,
   "branchConcurrentLimit": 0,
   "separateMinorPatch": true,
   "separateMultipleMajor": true,
