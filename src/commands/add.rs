@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 use crate::prompt::{self, Prompter};
 use crate::schema::{GildFileSparse, QuestionError};
@@ -106,7 +106,7 @@ pub fn run(gild_file: &GildFileSparse, interactive: bool) -> Result<(), Error> {
 }
 
 fn unique_changefile_path(dir: &Path) -> Result<PathBuf, Error> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for _ in 0..50 {
         let adjective = words::ADJECTIVES.choose(&mut rng).expect("non-empty");
