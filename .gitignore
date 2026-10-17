@@ -2,3 +2,6 @@
 .direnv/
 .docker.volumes/
 *.tmp
+.pre-commit-config.yaml
+target
+.idea

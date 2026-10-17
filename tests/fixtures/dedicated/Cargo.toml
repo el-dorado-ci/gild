@@ -1,0 +1,11 @@
+[package]
+name = "dedicated"
+version = "0.1.0"
+
+[package.metadata.gild]
+artifact_name = "should-not-be-picked"
+changefile_directory = ".changes"
+
+[package.metadata.gild.version_source]
+type = "command"
+command = "true"

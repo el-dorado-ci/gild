@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a branch makes the in-flight run redundant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: fmt, clippy, tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The hooks are `language: system`, so they run whatever cargo, rustfmt
+      # and clippy the dev shell provides - the same versions used locally.
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Cache cargo and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Cache pre-commit hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
