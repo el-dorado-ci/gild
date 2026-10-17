@@ -1,0 +1,2 @@
+bump_type: minor
+description: Adding `gild add` and `gild generate` commands.

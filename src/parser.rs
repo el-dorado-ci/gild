@@ -256,7 +256,7 @@ mod tests {
         assert!(matches!(
             questions[0].question_type,
             QuestionType::Choice { ref options }
-                if options == &["major", "minor", "patch", "prerelease"]
+                if options == &["major", "minor", "patch"]
         ));
         assert!(matches!(questions[1].question_type, QuestionType::Text));
     }
