@@ -3,7 +3,18 @@ name = "gild"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.gild]
+artifact_name = "gild"
+
+[package.metadata.gild.version_source]
+type = "regex"
+path = "Cargo.toml"
+pattern = '^version = "(.+)"$'
+
 [dependencies]
 clap = { version = "4.0", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.8"
+dialoguer = "0.11"
+rand = "0.8"
+serde_yaml = "0.9"

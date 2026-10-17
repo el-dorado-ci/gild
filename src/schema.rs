@@ -9,7 +9,7 @@ pub const DESCRIPTION_ID: &str = "description";
 
 // A closed set: a gild file can retitle the bump question but cannot add to,
 // remove from or reorder its answers.
-pub const BUMP_TYPES: [&str; 4] = ["major", "minor", "patch", "prerelease"];
+pub const BUMP_TYPES: [&str; 3] = ["major", "minor", "patch"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuestionType {
