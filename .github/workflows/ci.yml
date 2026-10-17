@@ -46,6 +46,11 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
+      # The clippy hook runs `cargo clippy --offline`, so the crates it
+      # needs have to already be in ~/.cargo/registry before it runs.
+      - name: Fetch dependencies
+        run: nix develop --command cargo fetch
+
       - name: Run fmt and clippy
         run: nix develop --command pre-commit run --all-files
 
