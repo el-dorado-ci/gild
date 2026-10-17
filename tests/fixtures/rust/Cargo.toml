@@ -1,0 +1,21 @@
+[package]
+name = "widget"
+version = "0.1.0"
+
+[package.metadata.gild]
+artifact_name = "widget-rs"
+changefile_directory = ".changes"
+
+[[package.metadata.gild.questions]]
+id = "breaking"
+title = "Is this breaking?"
+type = "bool"
+
+[package.metadata.gild.version_source]
+type = "regex"
+path = "Cargo.toml"
+pattern = '^version = "(.+)"$'
+
+[[package.metadata.gild.version_targets]]
+type = "command"
+command = "cargo set-version $GILD_VERSION"

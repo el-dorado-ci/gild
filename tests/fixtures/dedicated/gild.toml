@@ -1,0 +1,37 @@
+artifact_name = "dedicated"
+changefile_directory = ".gild"
+
+# Retitles the built-in. Its type and options are not up for grabs.
+[[questions]]
+id = "bump_type"
+title = "How big is this change?"
+
+[[questions]]
+id = "area"
+title = "Which area does this touch?"
+type = "choice"
+options = ["cli", "parser", "docs"]
+
+[[questions]]
+id = "notes"
+title = "Anything else worth noting?"
+type = "text"
+
+[[questions]]
+id = "breaking"
+title = "Is this breaking?"
+type = "bool"
+
+[version_source]
+type = "regex"
+path = "Cargo.toml"
+pattern = '^version = "(.+)"$'
+
+[[version_targets]]
+type = "command"
+command = "cargo set-version $GILD_VERSION"
+
+[[version_targets]]
+type = "regex"
+path = "README.md"
+pattern = '^current version: (.+)$'

@@ -1,0 +1,27 @@
+[project]
+name = "widget"
+version = "1.2.3"
+
+[tool.gild]
+artifact_name = "widget-py"
+changefile_directory = "changes"
+
+[[tool.gild.questions]]
+id = "kind"
+title = "What kind of change is this?"
+type = "choice"
+options = ["major", "minor", "patch"]
+
+[[tool.gild.questions]]
+id = "summary"
+title = "Summarise the change"
+type = "text"
+
+[tool.gild.version_source]
+type = "regex"
+path = "pyproject.toml"
+pattern = '^version = "(.+)"$'
+
+[[tool.gild.version_targets]]
+type = "command"
+command = "uv version $GILD_VERSION"

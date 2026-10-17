@@ -1,0 +1,10 @@
+[package]
+name = "widget"
+version = "0.1.0"
+
+[package.metadata.gild]
+artifact_name = "widget-polyglot"
+
+[package.metadata.gild.version_source]
+type = "command"
+command = "git describe --tags"

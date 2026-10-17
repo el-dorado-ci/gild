@@ -1,0 +1,6 @@
+[project]
+name = "widget"
+version = "1.2.3"
+
+[tool.ruff]
+line-length = 100
