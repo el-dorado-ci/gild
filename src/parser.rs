@@ -1,23 +1,18 @@
-use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use thiserror::Error as ThisError;
 
 use crate::schema::{GildFileSparse, QuestionError};
 
-// Checked in order when no path is configured; the first one holding a gild
-// config wins.
 pub const DISCOVERY_ORDER: [&str; 3] = ["gild.toml", "pyproject.toml", "Cargo.toml"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind {
-    // A dedicated gild file: the config is the whole document.
     Gild,
-    // `[tool.gild]`, the convention for third-party tools in pyproject.toml.
     PyProject,
-    // `[package.metadata.gild]`, the same idea in Cargo.toml.
     Cargo,
 }
 
@@ -30,7 +25,6 @@ impl FileKind {
         }
     }
 
-    // The table the config sits under, as a path from the document root.
     fn table(self) -> &'static [&'static str] {
         match self {
             FileKind::Gild => &[],
@@ -38,50 +32,28 @@ impl FileKind {
             FileKind::Cargo => &["package", "metadata", "gild"],
         }
     }
+
+    fn describe(self) -> &'static str {
+        match self {
+            FileKind::Gild => "gild",
+            FileKind::PyProject => "[tool.gild]",
+            FileKind::Cargo => "[package.metadata.gild]",
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, ThisError)]
 pub enum Error {
-    Read(PathBuf, io::Error),
-    Toml(PathBuf, toml::de::Error),
-    // Valid TOML, but it carries no gild config.
+    #[error("could not read {}: {}", .0.display(), .1)]
+    Read(PathBuf, #[source] io::Error),
+    #[error("could not parse {}: {}", .0.display(), .1)]
+    Toml(PathBuf, #[source] toml::de::Error),
+    #[error("{} has no {} table", .0.display(), .1)]
     NoConfig(PathBuf, &'static str),
-    // Nothing configured and nothing to discover.
+    #[error("no gild config in {}: looked for {}", .0.display(), DISCOVERY_ORDER.join(", "))]
     NotFound(PathBuf),
-    // Parsed, but the questions do not describe something answerable.
-    Question(PathBuf, QuestionError),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Read(path, source) => write!(f, "could not read {}: {source}", path.display()),
-            Error::Toml(path, source) => write!(f, "could not parse {}: {source}", path.display()),
-            Error::NoConfig(path, table) => {
-                write!(f, "{} has no {table} table", path.display())
-            }
-            Error::Question(path, source) => {
-                write!(f, "{}: {source}", path.display())
-            }
-            Error::NotFound(dir) => write!(
-                f,
-                "no gild config in {}: looked for {}",
-                dir.display(),
-                DISCOVERY_ORDER.join(", ")
-            ),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::Read(_, source) => Some(source),
-            Error::Toml(_, source) => Some(source),
-            Error::Question(_, source) => Some(source),
-            Error::NoConfig(..) | Error::NotFound(_) => None,
-        }
-    }
+    #[error("{}: {}", .0.display(), .1)]
+    Question(PathBuf, #[source] QuestionError),
 }
 
 pub fn parse(contents: &str, kind: FileKind, path: &Path) -> Result<GildFileSparse, Error> {
@@ -94,26 +66,17 @@ pub fn parse(contents: &str, kind: FileKind, path: &Path) -> Result<GildFileSpar
         table = table
             .get(key)
             .cloned()
-            .ok_or_else(|| Error::NoConfig(path.to_path_buf(), describe(kind)))?;
+            .ok_or_else(|| Error::NoConfig(path.to_path_buf(), kind.describe()))?;
     }
 
     let parsed = GildFileSparse::deserialize(table)
         .map_err(|source| Error::Toml(path.to_path_buf(), source))?;
 
-    // Catch unanswerable questions here rather than at prompt time.
     parsed
         .resolved_questions()
         .map_err(|source| Error::Question(path.to_path_buf(), source))?;
 
     Ok(parsed)
-}
-
-fn describe(kind: FileKind) -> &'static str {
-    match kind {
-        FileKind::Gild => "gild",
-        FileKind::PyProject => "[tool.gild]",
-        FileKind::Cargo => "[package.metadata.gild]",
-    }
 }
 
 pub fn load(path: &Path) -> Result<GildFileSparse, Error> {
@@ -123,8 +86,6 @@ pub fn load(path: &Path) -> Result<GildFileSparse, Error> {
     parse(&contents, FileKind::for_path(path), path)
 }
 
-// An explicit path is read as-is; otherwise walk DISCOVERY_ORDER in `dir`,
-// stepping over files that exist but hold no gild config.
 pub fn load_from(config_path: Option<&str>, dir: &Path) -> Result<GildFileSparse, Error> {
     if let Some(path) = config_path {
         return load(Path::new(path));
@@ -155,8 +116,6 @@ mod tests {
             .join("tests/fixtures")
             .join(dir)
     }
-
-    // A minimal valid config, so question tests only vary the questions.
     fn with_questions(questions: &str) -> String {
         format!(
             "artifact_name = \"x\"\n\n\
@@ -186,9 +145,6 @@ mod tests {
             .title
             .clone()
     }
-
-    // --- one test per supported file type -----------------------------------
-
     #[test]
     fn parses_a_dedicated_gild_file() {
         let parsed = load(&fixture("dedicated").join("gild.toml")).unwrap();
@@ -234,12 +190,8 @@ mod tests {
         assert_ne!(python.artifact_name, "widget");
         assert_ne!(rust.artifact_name, "widget");
     }
-
-    // --- built-in questions -------------------------------------------------
-
     #[test]
     fn bump_type_and_description_need_no_mention_in_the_file() {
-        // The polyglot fixture declares no questions at all.
         let parsed = load(&fixture("polyglot").join("Cargo.toml")).unwrap();
 
         assert_eq!(
@@ -251,8 +203,6 @@ mod tests {
     #[test]
     fn built_ins_carry_their_own_types() {
         let questions = parse_questions("").unwrap();
-
-        // Pinned literally: the bump answers are a closed set.
         assert!(matches!(
             questions[0].question_type,
             QuestionType::Choice { ref options }
@@ -269,7 +219,6 @@ mod tests {
         .unwrap();
 
         assert_eq!(titled(&questions, "bump_type"), "How big is this change?");
-        // Retitling must not duplicate it or move it.
         assert_eq!(ids(&questions), ["bump_type", "description"]);
     }
 
@@ -336,9 +285,6 @@ mod tests {
             "got {error:?}"
         );
     }
-
-    // --- question schema ----------------------------------------------------
-
     #[test]
     fn parses_every_question_type() {
         let parsed = load(&fixture("dedicated").join("gild.toml")).unwrap();
@@ -443,9 +389,6 @@ mod tests {
 
         assert!(matches!(error, Error::Toml(..)), "got {error:?}");
     }
-
-    // --- the rest of the schema ---------------------------------------------
-
     #[test]
     fn parses_both_version_location_forms() {
         let parsed = load(&fixture("dedicated").join("gild.toml")).unwrap();
@@ -475,7 +418,6 @@ mod tests {
 
     #[test]
     fn changefile_directory_defaults_to_dot_gild() {
-        // The polyglot fixture leaves the key out entirely.
         let parsed = load(&fixture("polyglot").join("Cargo.toml")).unwrap();
 
         assert_eq!(parsed.changefile_directory, ".gild");
@@ -504,9 +446,6 @@ mod tests {
             FileKind::Gild
         );
     }
-
-    // --- discovery ----------------------------------------------------------
-
     #[test]
     fn discovery_prefers_a_dedicated_gild_file() {
         let parsed = load_from(None, &fixture("dedicated")).unwrap();
@@ -528,9 +467,6 @@ mod tests {
 
         assert_eq!(parsed.artifact_name, "widget-py");
     }
-
-    // --- failure modes ------------------------------------------------------
-
     #[test]
     fn a_manifest_without_a_gild_table_is_not_a_config() {
         let error = load(&fixture("bare").join("Cargo.toml")).unwrap_err();
