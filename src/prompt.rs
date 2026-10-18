@@ -1,8 +1,8 @@
-use std::fmt;
 use std::io::{self, BufRead, Write};
 
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Input, Select};
+use thiserror::Error as ThisError;
 
 use crate::schema::{Question, QuestionType};
 
@@ -22,51 +22,18 @@ impl Answer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, ThisError)]
 pub enum Error {
-    Io(io::Error),
-    Dialoguer(dialoguer::Error),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Dialoguer(#[from] dialoguer::Error),
+    #[error("stdin closed before `{0}` was answered")]
     Eof(String),
+    #[error("`{input}` is not a valid answer for `{id}`")]
     InvalidChoice { id: String, input: String },
+    #[error("`{input}` is not yes or no for `{id}`")]
     InvalidBool { id: String, input: String },
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Io(source) => write!(f, "{source}"),
-            Error::Dialoguer(source) => write!(f, "{source}"),
-            Error::Eof(id) => write!(f, "stdin closed before `{id}` was answered"),
-            Error::InvalidChoice { id, input } => {
-                write!(f, "`{input}` is not a valid answer for `{id}`")
-            }
-            Error::InvalidBool { id, input } => {
-                write!(f, "`{input}` is not yes or no for `{id}`")
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::Io(source) => Some(source),
-            Error::Dialoguer(source) => Some(source),
-            Error::Eof(_) | Error::InvalidChoice { .. } | Error::InvalidBool { .. } => None,
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(source: io::Error) -> Self {
-        Error::Io(source)
-    }
-}
-
-impl From<dialoguer::Error> for Error {
-    fn from(source: dialoguer::Error) -> Self {
-        Error::Dialoguer(source)
-    }
 }
 
 pub trait Prompter {
@@ -117,12 +84,12 @@ impl<R: BufRead> NonInteractive<R> {
         Self { reader }
     }
 
-    fn read_line(&mut self, question: &Question) -> Result<String, Error> {
+    fn prompt(&mut self, question: &Question, hint: &str) -> Result<String, Error> {
+        eprintln!("{}{hint}", question.title);
         io::stderr().flush()?;
 
         let mut line = String::new();
-        let bytes_read = self.reader.read_line(&mut line)?;
-        if bytes_read == 0 {
+        if self.reader.read_line(&mut line)? == 0 {
             return Err(Error::Eof(question.id.clone()));
         }
 
@@ -132,38 +99,27 @@ impl<R: BufRead> NonInteractive<R> {
 
 impl<R: BufRead> Prompter for NonInteractive<R> {
     fn ask(&mut self, question: &Question) -> Result<Answer, Error> {
+        let id = || question.id.clone();
+
         match &question.question_type {
             QuestionType::Choice { options } => {
-                eprintln!("{} [{}]", question.title, options.join(", "));
-                let input = self.read_line(question)?;
+                let input = self.prompt(question, &format!(" [{}]", options.join(", ")))?;
 
                 options
                     .iter()
                     .find(|option| option.eq_ignore_ascii_case(&input))
                     .cloned()
                     .map(Answer::Choice)
-                    .ok_or_else(|| Error::InvalidChoice {
-                        id: question.id.clone(),
-                        input,
-                    })
+                    .ok_or(Error::InvalidChoice { id: id(), input })
             }
-            QuestionType::Text => {
-                eprintln!("{}", question.title);
-                let input = self.read_line(question)?;
-
-                Ok(Answer::Text(input))
-            }
+            QuestionType::Text => Ok(Answer::Text(self.prompt(question, "")?)),
             QuestionType::Bool => {
-                eprintln!("{} [y/n]", question.title);
-                let input = self.read_line(question)?;
+                let input = self.prompt(question, " [y/n]")?;
 
                 match input.to_ascii_lowercase().as_str() {
                     "y" | "yes" | "true" => Ok(Answer::Bool(true)),
                     "n" | "no" | "false" => Ok(Answer::Bool(false)),
-                    _ => Err(Error::InvalidBool {
-                        id: question.id.clone(),
-                        input,
-                    }),
+                    _ => Err(Error::InvalidBool { id: id(), input }),
                 }
             }
         }

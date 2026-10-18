@@ -1,8 +1,12 @@
 use clap::{Parser, Subcommand};
 
+use crate::commands::add::Add;
+use crate::commands::ask::Ask;
+use crate::commands::generate::Generate;
+use crate::commands::query::Query;
+
 #[derive(Parser)]
 pub struct Config {
-    // Left unset, gild discovers a config file in the working directory.
     #[arg(long, env = "GILD_CONFIG_PATH")]
     pub config_path: Option<String>,
 
@@ -15,6 +19,8 @@ pub struct Config {
 
 #[derive(Subcommand)]
 pub enum Command {
-    Add,
-    Generate,
+    Add(Add),
+    Generate(Generate),
+    Query(Query),
+    Ask(Ask),
 }

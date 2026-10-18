@@ -11,6 +11,10 @@ type = "regex"
 path = "Cargo.toml"
 pattern = '^version = "(.+)"$'
 
+[package.metadata.gild.queries]
+major_changes = "contains([*bump_type], 'major')"
+minor_changes = "contains([*bump_type], 'minor')"
+
 [dependencies]
 clap = { version = "4.0", features = ["derive", "env"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -18,3 +22,8 @@ toml = "1.1.8"
 dialoguer = "0.11"
 rand = "0.10"
 serde_yaml = "0.9"
+jmespath = "0.5.0"
+serde_json = "1.0.154"
+colored = "3.1.1"
+
+thiserror = "2.0.21"

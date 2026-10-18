@@ -35,3 +35,8 @@ command = "cargo set-version $GILD_VERSION"
 type = "regex"
 path = "README.md"
 pattern = '^current version: (.+)$'
+
+[queries]
+breaking = "[?breaking].description"
+descriptions = "[*].description"
+minors = "[?bump_type=='minor']"

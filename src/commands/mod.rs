@@ -1,56 +1,63 @@
 pub mod add;
+pub mod ask;
 pub mod generate;
+pub mod query;
 
-use std::fmt;
+use std::io;
+use std::path::PathBuf;
 
-use crate::env::Command;
-use crate::schema::GildFileSparse;
+use thiserror::Error as ThisError;
 
-#[derive(Debug)]
+use crate::env::Command as Subcommand;
+use crate::prompt;
+use crate::schema::{GildFileSparse, QuestionError};
+use crate::utils;
+
+pub trait Command {
+    fn run(&self, gild_file: &GildFileSparse, interactive: bool) -> Result<(), Error>;
+}
+
+#[derive(Debug, ThisError)]
 pub enum Error {
-    Add(add::Error),
-    Generate(generate::Error),
+    #[error(transparent)]
+    Question(#[from] QuestionError),
+    #[error(transparent)]
+    Prompt(#[from] prompt::Error),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml::Error),
+    #[error(transparent)]
+    Changefile(#[from] utils::Error),
+    #[error("could not find an unused changefile name in {}", .0.display())]
+    NoAvailableName(PathBuf),
+    #[error("Invalid JMESPath query '{0}': {1}")]
+    InvalidQuery(String, #[source] Box<jmespath::JmespathError>),
+    #[error("JMESPath evaluation failed: {0}")]
+    QueryFailed(#[source] Box<jmespath::JmespathError>),
+    #[error("no query named `{}` in the gild file; defined queries: {}", .0, defined(.1))]
+    UnknownQuery(String, Vec<String>),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Add(source) => write!(f, "{source}"),
-            Error::Generate(source) => write!(f, "{source}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::Add(source) => Some(source),
-            Error::Generate(source) => Some(source),
-        }
-    }
-}
-
-impl From<add::Error> for Error {
-    fn from(source: add::Error) -> Self {
-        Error::Add(source)
-    }
-}
-
-impl From<generate::Error> for Error {
-    fn from(source: generate::Error) -> Self {
-        Error::Generate(source)
+fn defined(aliases: &[String]) -> String {
+    if aliases.is_empty() {
+        "none".to_owned()
+    } else {
+        aliases.join(", ")
     }
 }
 
 pub fn dispatch(
-    command: Command,
+    command: Subcommand,
     gild_file: &GildFileSparse,
     interactive: bool,
 ) -> Result<(), Error> {
     match command {
-        Command::Add => add::run(gild_file, interactive)?,
-        Command::Generate => generate::run(gild_file)?,
+        Subcommand::Add(add) => add.run(gild_file, interactive),
+        Subcommand::Generate(generate) => generate.run(gild_file, interactive),
+        Subcommand::Query(query) => query.run(gild_file, interactive),
+        Subcommand::Ask(ask) => ask.run(gild_file, interactive),
     }
-
-    Ok(())
 }
