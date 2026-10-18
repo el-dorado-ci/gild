@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use crate::commands::add::Add;
+use crate::commands::ask::Ask;
 use crate::commands::generate::Generate;
 use crate::commands::query::Query;
 
@@ -21,4 +22,5 @@ pub enum Command {
     Add(Add),
     Generate(Generate),
     Query(Query),
+    Ask(Ask),
 }

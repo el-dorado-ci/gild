@@ -417,6 +417,27 @@ mod tests {
     }
 
     #[test]
+    fn queries_default_to_empty() {
+        let parsed = load(&fixture("polyglot").join("Cargo.toml")).unwrap();
+
+        assert!(parsed.queries.is_empty());
+    }
+
+    #[test]
+    fn parses_query_aliases() {
+        let parsed = load(&fixture("dedicated").join("gild.toml")).unwrap();
+
+        assert_eq!(
+            parsed.queries.keys().collect::<Vec<_>>(),
+            ["breaking", "descriptions", "minors"]
+        );
+        assert_eq!(
+            parsed.queries.get("descriptions").map(String::as_str),
+            Some("[*].description")
+        );
+    }
+
+    #[test]
     fn changefile_directory_defaults_to_dot_gild() {
         let parsed = load(&fixture("polyglot").join("Cargo.toml")).unwrap();
 

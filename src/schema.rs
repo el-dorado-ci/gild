@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -106,6 +108,8 @@ pub struct GildFileSparse {
     pub changefile_directory: String,
     #[serde(default)]
     pub questions: Vec<QuestionSparse>,
+    #[serde(default)]
+    pub queries: BTreeMap<String, String>,
     #[allow(dead_code)]
     pub version_source: VersionLocation,
     #[serde(default)]

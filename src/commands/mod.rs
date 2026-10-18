@@ -1,4 +1,5 @@
 pub mod add;
+pub mod ask;
 pub mod generate;
 pub mod query;
 
@@ -34,8 +35,18 @@ pub enum Error {
     InvalidQuery(String, #[source] Box<jmespath::JmespathError>),
     #[error("JMESPath evaluation failed: {0}")]
     QueryFailed(#[source] Box<jmespath::JmespathError>),
+    #[error("no query named `{}` in the gild file; defined queries: {}", .0, defined(.1))]
+    UnknownQuery(String, Vec<String>),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+}
+
+fn defined(aliases: &[String]) -> String {
+    if aliases.is_empty() {
+        "none".to_owned()
+    } else {
+        aliases.join(", ")
+    }
 }
 
 pub fn dispatch(
@@ -47,5 +58,6 @@ pub fn dispatch(
         Subcommand::Add(add) => add.run(gild_file, interactive),
         Subcommand::Generate(generate) => generate.run(gild_file, interactive),
         Subcommand::Query(query) => query.run(gild_file, interactive),
+        Subcommand::Ask(ask) => ask.run(gild_file, interactive),
     }
 }

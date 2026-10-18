@@ -13,24 +13,27 @@ pub struct Query {
     jmespath: String,
 }
 
+pub fn run_query(jmespath: &str, dir: &Path) -> Result<(), Error> {
+    let expression = jmespath::compile(jmespath)
+        .map_err(|source| Error::InvalidQuery(jmespath.to_owned(), Box::new(source)))?;
+
+    let documents: Vec<Value> = utils::read_changefiles(dir)?
+        .into_iter()
+        .map(|changefile| serde_json::to_value(changefile.fields))
+        .collect::<Result<_, _>>()?;
+
+    let result = expression
+        .search(Value::Array(documents))
+        .map_err(|source| Error::QueryFailed(Box::new(source)))?;
+
+    println!("{}", colorize_json(&serde_json::to_string_pretty(&result)?));
+
+    Ok(())
+}
+
 impl Command for Query {
     fn run(&self, gild_file: &GildFileSparse, _interactive: bool) -> Result<(), Error> {
-        let expression = jmespath::compile(&self.jmespath)
-            .map_err(|source| Error::InvalidQuery(self.jmespath.clone(), Box::new(source)))?;
-
-        let dir = Path::new(&gild_file.changefile_directory);
-        let documents: Vec<Value> = utils::read_changefiles(dir)?
-            .into_iter()
-            .map(|changefile| serde_json::to_value(changefile.fields))
-            .collect::<Result<_, _>>()?;
-
-        let result = expression
-            .search(Value::Array(documents))
-            .map_err(|source| Error::QueryFailed(Box::new(source)))?;
-
-        println!("{}", colorize_json(&serde_json::to_string_pretty(&result)?));
-
-        Ok(())
+        run_query(&self.jmespath, Path::new(&gild_file.changefile_directory))
     }
 }
 
