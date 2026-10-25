@@ -1,0 +1,2 @@
+bump_type: patch
+description: Fix the Homebrew formula job so it can push to the tap
