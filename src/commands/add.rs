@@ -1,36 +1,52 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use clap::Args;
 use rand::seq::IndexedRandom;
 
 use crate::commands::{Command, Error};
-use crate::prompt::{Interactive, NonInteractive, Prompter};
-use crate::schema::GildFileSparse;
+use crate::prompt::{Answer, Interactive, Prompter};
+use crate::schema::{GildFileSparse, flag};
 use crate::words;
 
-#[derive(Args)]
-pub struct Add;
+#[derive(Args, Default)]
+pub struct Add {
+    #[arg(skip)]
+    pub answers: Vec<(String, Answer)>,
+}
 
 impl Command for Add {
     fn run(&self, gild_file: &GildFileSparse, interactive: bool) -> Result<(), Error> {
         let questions = gild_file.resolved_questions()?;
-
-        let stdin = io::stdin();
-        let mut prompter: Box<dyn Prompter> = if interactive {
-            Box::new(Interactive)
-        } else {
-            Box::new(NonInteractive::new(stdin.lock()))
-        };
+        let mut prompter = Interactive;
 
         let mut answers = serde_yaml::Mapping::new();
+        let mut missing = Vec::new();
+
         for question in &questions {
-            let answer = prompter.ask(question)?;
+            let given = self
+                .answers
+                .iter()
+                .find(|(id, _)| *id == question.id)
+                .map(|(_, answer)| answer.clone());
+
+            let answer = match given {
+                Some(answer) => answer,
+                None if interactive => prompter.ask(question)?,
+                None => {
+                    missing.push(format!("--{}", flag(&question.id)));
+                    continue;
+                }
+            };
+
             answers.insert(
                 serde_yaml::Value::String(question.id.clone()),
                 answer.into_yaml(),
             );
+        }
+
+        if !missing.is_empty() {
+            return Err(Error::MissingAnswers(missing));
         }
 
         let dir = Path::new(&gild_file.changefile_directory);

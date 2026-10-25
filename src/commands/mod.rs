@@ -31,6 +31,8 @@ pub enum Error {
     Changefile(#[from] utils::Error),
     #[error("could not find an unused changefile name in {}", .0.display())]
     NoAvailableName(PathBuf),
+    #[error("non-interactive mode needs {}", .0.join(" "))]
+    MissingAnswers(Vec<String>),
     #[error("Invalid JMESPath query '{0}': {1}")]
     InvalidQuery(String, #[source] Box<jmespath::JmespathError>),
     #[error("JMESPath evaluation failed: {0}")]
