@@ -5,11 +5,12 @@ use crate::commands::add::Add;
 use crate::commands::ask::Ask;
 use crate::commands::generate::Generate;
 use crate::commands::query::Query;
-use crate::commands::version::Version;
+use crate::commands::staged_version::StagedVersion;
 use crate::prompt::Answer;
 use crate::schema::{Question, QuestionType, flag};
 
 #[derive(Parser)]
+#[command(name = "gild", version)]
 pub struct Config {
     #[arg(long, env = "GILD_CONFIG_PATH")]
     pub config_path: Option<String>,
@@ -27,7 +28,7 @@ pub enum Command {
     Generate(Generate),
     Query(Query),
     Ask(Ask),
-    Version(Version),
+    StagedVersion(StagedVersion),
 }
 
 pub fn preparse_config_path() -> Option<String> {

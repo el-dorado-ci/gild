@@ -2,7 +2,7 @@ pub mod add;
 pub mod ask;
 pub mod generate;
 pub mod query;
-pub mod version;
+pub mod staged_version;
 
 use std::io;
 use std::path::PathBuf;
@@ -70,6 +70,6 @@ pub fn dispatch(
         Subcommand::Generate(generate) => generate.run(gild_file, interactive),
         Subcommand::Query(query) => query.run(gild_file, interactive),
         Subcommand::Ask(ask) => ask.run(gild_file, interactive),
-        Subcommand::Version(version) => version.run(gild_file, interactive),
+        Subcommand::StagedVersion(staged) => staged.run(gild_file, interactive),
     }
 }

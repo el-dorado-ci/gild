@@ -8,9 +8,9 @@ use crate::utils;
 use crate::version;
 
 #[derive(Args)]
-pub struct Version;
+pub struct StagedVersion;
 
-impl Command for Version {
+impl Command for StagedVersion {
     fn run(&self, gild_file: &GildFileSparse, _interactive: bool) -> Result<(), Error> {
         let changefiles = utils::read_changefiles(Path::new(&gild_file.changefile_directory))?;
         let current = version::current(&gild_file.version_source)?;

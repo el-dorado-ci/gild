@@ -1,0 +1,33 @@
+name: gild-cli
+base: core24
+adopt-info: gild
+summary: A changelog tool built on structured changefiles
+description: |
+  gild brings the sentiment behind pull-request templates into a more
+  structured format. Contributors answer a short set of configurable
+  questions, gild stores each answer as a changefile, and at release time it
+  assembles them into a changelog, bumps the version and tags the release.
+
+license: MIT
+source-code: https://github.com/el-dorado-ci/gild
+issues: https://github.com/el-dorado-ci/gild/issues
+
+grade: stable
+confinement: classic
+
+platforms:
+  amd64:
+  arm64:
+
+parts:
+  gild:
+    plugin: rust
+    source: .
+    override-pull: |
+      craftctl default
+      craftctl set version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+
+apps:
+  gild-cli:
+    command: bin/gild
+    aliases: [gild]
