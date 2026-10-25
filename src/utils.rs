@@ -13,7 +13,7 @@ pub enum Error {
 }
 
 pub struct Changefile {
-    pub name: String,
+    pub path: PathBuf,
     pub fields: serde_yaml::Mapping,
 }
 
@@ -41,13 +41,24 @@ pub fn read_changefiles(dir: &Path) -> Result<Vec<Changefile>, Error> {
                 fs::read_to_string(&path).map_err(|source| Error::Read(path.clone(), source))?;
             let fields = serde_yaml::from_str(&contents)
                 .map_err(|source| Error::Parse(path.clone(), source))?;
-            let name = path
-                .file_stem()
-                .and_then(|stem| stem.to_str())
-                .unwrap_or("?")
-                .to_owned();
 
-            Ok(Changefile { name, fields })
+            Ok(Changefile { path, fields })
         })
         .collect()
+}
+
+pub fn command_output(program: &str, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new(program)
+        .args(args)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let text = String::from_utf8(output.stdout).ok()?;
+    let trimmed = text.trim();
+
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
 }

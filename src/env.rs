@@ -5,6 +5,7 @@ use crate::commands::add::Add;
 use crate::commands::ask::Ask;
 use crate::commands::generate::Generate;
 use crate::commands::query::Query;
+use crate::commands::version::Version;
 use crate::prompt::Answer;
 use crate::schema::{Question, QuestionType, flag};
 
@@ -26,6 +27,7 @@ pub enum Command {
     Generate(Generate),
     Query(Query),
     Ask(Ask),
+    Version(Version),
 }
 
 pub fn preparse_config_path() -> Option<String> {
