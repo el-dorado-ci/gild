@@ -20,12 +20,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Decode the App private key
+        id: app-key
+        env:
+          ENCODED_KEY: ${{ secrets.EL_DORADO_PR_BOT_PRIVATE_KEY }}
+        run: |
+          key="$(printf '%s' "$ENCODED_KEY" | base64 -d)"
+
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::add-mask::$line"
+          done <<< "$key"
+
+          {
+            echo "pem<<GILD_PRIVATE_KEY"
+            echo "$key"
+            echo "GILD_PRIVATE_KEY"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.EL_DORADO_PR_BOT_APP_ID }}
-          private-key: ${{ secrets.EL_DORADO_PR_BOT_PRIVATE_KEY }}
+          private-key: ${{ steps.app-key.outputs.pem }}
 
       - uses: actions/checkout@v7
         with:
@@ -79,8 +95,6 @@ jobs:
           ./target/release/gild generate --online > "${RUNNER_TEMP}/release-notes.md"
           ./target/release/gild generate --apply --online
 
-          # Bumping the version in Cargo.toml leaves Cargo.lock's own entry
-          # stale, which a --locked build would reject.
           nix develop --command cargo update --offline --package gild
 
       - name: Open or update the pull request
