@@ -1,7 +1,17 @@
 [package]
-name = "gild"
+name = "gild-cli"
 version = "0.2.0"
 edition = "2024"
+description = "A changelog tool that turns structured changefiles into releases"
+license = "MIT"
+repository = "https://github.com/el-dorado-ci/gild"
+readme = "README.md"
+keywords = ["changelog", "changeset", "release", "versioning", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "gild"
+path = "src/main.rs"
 
 [package.metadata.gild]
 artifact_name = "gild"

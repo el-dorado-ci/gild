@@ -14,6 +14,8 @@ jobs:
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.ref == 'gild/release'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.publish.outputs.version }}
 
     steps:
       - name: Decode the App private key
@@ -67,10 +69,12 @@ jobs:
         run: nix develop --command cargo build --release
 
       - name: Tag and publish the release
+        id: publish
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          version="$(./target/release/gild version)"
+          version="$(./target/release/gild staged-version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
           if gh release view "v${version}" > /dev/null 2>&1; then
             echo "v${version} already released."
@@ -83,3 +87,176 @@ jobs:
             --target main \
             --title "v${version}" \
             --notes-file "${RUNNER_TEMP}/notes.md"
+
+  binaries:
+    name: ${{ matrix.target }}
+    needs: release
+    permissions:
+      contents: write
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: gild
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+          include: LICENSE,README.md
+          checksum: sha256
+          ref: refs/tags/v${{ needs.release.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  snap:
+    name: snap store
+    needs: release
+    continue-on-error: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - name: Check for store credentials
+        id: store
+        env:
+          CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          if [ -n "$CREDENTIALS" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "SNAPCRAFT_STORE_CREDENTIALS is not set; built but not published."
+          fi
+
+      - uses: snapcore/action-publish@v1
+        if: steps.store.outputs.ready == 'true'
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
+
+  homebrew:
+    name: homebrew tap
+    needs: [release, binaries]
+    continue-on-error: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Decode the App private key
+        id: app-key
+        env:
+          ENCODED_KEY: ${{ secrets.EL_DORADO_PR_BOT_PRIVATE_KEY }}
+        run: |
+          key="$(printf '%s' "$ENCODED_KEY" | base64 -d)"
+
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::add-mask::$line"
+          done <<< "$key"
+
+          {
+            echo "pem<<GILD_PRIVATE_KEY"
+            echo "$key"
+            echo "GILD_PRIVATE_KEY"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.EL_DORADO_PR_BOT_APP_ID }}
+          private-key: ${{ steps.app-key.outputs.pem }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+
+      - name: Update the formula
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+          TAP: ${{ github.repository_owner }}/homebrew-tap
+        run: |
+          if ! gh repo view "$TAP" > /dev/null 2>&1; then
+            echo "::warning::${TAP} does not exist; skipping the Homebrew formula."
+            exit 0
+          fi
+
+          mkdir sums && cd sums
+          gh release download "v${VERSION}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*.sha256'
+          cd ..
+
+          base="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+          sum() { cut -d' ' -f1 < "sums/gild-v${VERSION}-$1.tar.gz.sha256"; }
+
+          gh repo clone "$TAP" tap -- --depth 1
+          mkdir -p tap/Formula
+
+          cat > tap/Formula/gild-cli.rb <<FORMULA
+          class GildCli < Formula
+            desc "A changelog tool that turns structured changefiles into releases"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "${base}/gild-v${VERSION}-aarch64-apple-darwin.tar.gz"
+                sha256 "$(sum aarch64-apple-darwin)"
+              end
+              on_intel do
+                url "${base}/gild-v${VERSION}-x86_64-apple-darwin.tar.gz"
+                sha256 "$(sum x86_64-apple-darwin)"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "${base}/gild-v${VERSION}-aarch64-unknown-linux-musl.tar.gz"
+                sha256 "$(sum aarch64-unknown-linux-musl)"
+              end
+              on_intel do
+                url "${base}/gild-v${VERSION}-x86_64-unknown-linux-musl.tar.gz"
+                sha256 "$(sum x86_64-unknown-linux-musl)"
+              end
+            end
+
+            def install
+              bin.install "gild"
+            end
+
+            test do
+              assert_match "generate", shell_output("#{bin}/gild --help")
+            end
+          end
+          FORMULA
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/gild-cli.rb
+          git commit --message "gild ${VERSION}"
+          git push

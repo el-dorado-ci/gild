@@ -89,13 +89,13 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          version="$(./target/release/gild version)"
+          version="$(./target/release/gild staged-version)"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
           ./target/release/gild generate --online > "${RUNNER_TEMP}/release-notes.md"
           ./target/release/gild generate --apply --online
 
-          nix develop --command cargo update --offline --package gild
+          nix develop --command cargo update --offline --package gild-cli
 
       - name: Open or update the pull request
         if: steps.pending.outputs.found == 'true'
