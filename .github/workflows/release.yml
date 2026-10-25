@@ -192,17 +192,18 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: homebrew-tap
 
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          token: ${{ steps.app-token.outputs.token }}
+          path: tap
+
       - name: Update the formula
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ needs.release.outputs.version }}
           TAP: ${{ github.repository_owner }}/homebrew-tap
         run: |
-          if ! gh repo view "$TAP" > /dev/null 2>&1; then
-            echo "::warning::${TAP} does not exist; skipping the Homebrew formula."
-            exit 0
-          fi
-
           mkdir sums && cd sums
           gh release download "v${VERSION}" \
             --repo "${{ github.repository }}" \
@@ -210,9 +211,8 @@ jobs:
           cd ..
 
           base="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
-          sum() { cut -d' ' -f1 < "sums/gild-v${VERSION}-$1.tar.gz.sha256"; }
+          sum() { cut -d" " -f1 < "sums/gild-v${VERSION}-$1.sha256"; }
 
-          gh repo clone "$TAP" tap -- --depth 1
           mkdir -p tap/Formula
 
           cat > tap/Formula/gild-cli.rb <<FORMULA
@@ -258,5 +258,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/gild-cli.rb
+
+          if git diff --cached --quiet; then
+            echo "Formula already up to date."
+            exit 0
+          fi
+
           git commit --message "gild ${VERSION}"
           git push
