@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 - 2026-10-25
+
+### patch
+
+- @kassett: Fix the Homebrew formula job so it can push to the tap ([#27](https://github.com/el-dorado-ci/gild/pull/27))
+
 ## 0.2.1 - 2026-10-25
 
 ### patch
