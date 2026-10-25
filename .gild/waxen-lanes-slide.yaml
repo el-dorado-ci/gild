@@ -1,0 +1,2 @@
+bump_type: patch
+description: Fixing the private key invocation for the El Dorado Private Key, which is saved as b64 encoded
