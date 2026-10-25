@@ -371,6 +371,39 @@ mod tests {
     }
 
     #[test]
+    fn an_id_cannot_collide_with_a_built_in_flag() {
+        for id in ["help", "version", "config_path", "non_interactive"] {
+            let error = parse_questions(&format!(
+                "[[questions]]\nid = \"{id}\"\ntitle = \"T\"\ntype = \"text\"\n"
+            ))
+            .unwrap_err();
+
+            assert!(
+                matches!(error, Error::Question(_, QuestionError::ReservedId(ref got, _)) if got == id),
+                "got {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_ids_cannot_produce_the_same_flag() {
+        let error = parse_questions(
+            "[[questions]]\nid = \"my_flag\"\ntitle = \"A\"\ntype = \"text\"\n\n\
+             [[questions]]\nid = \"my-flag\"\ntitle = \"B\"\ntype = \"text\"\n",
+        )
+        .unwrap_err();
+
+        assert!(
+            matches!(
+                error,
+                Error::Question(_, QuestionError::FlagCollision(ref first, ref second, ref name))
+                    if first == "my_flag" && second == "my-flag" && name == "my-flag"
+            ),
+            "got {error:?}"
+        );
+    }
+
+    #[test]
     fn an_unknown_question_type_is_rejected() {
         let contents =
             with_questions("[[questions]]\nid = \"a\"\ntitle = \"A?\"\ntype = \"bogus\"\n");

@@ -8,6 +8,12 @@ pub const DESCRIPTION_ID: &str = "description";
 
 pub const BUMP_TYPES: [&str; 3] = ["major", "minor", "patch"];
 
+const RESERVED_FLAGS: [&str; 4] = ["help", "version", "config-path", "non-interactive"];
+
+pub fn flag(id: &str) -> String {
+    id.replace('_', "-")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuestionType {
     Choice { options: Vec<String> },
@@ -98,6 +104,10 @@ pub enum QuestionError {
     BuiltinRedefined(String),
     #[error("question `{0}` is defined twice")]
     DuplicateId(String),
+    #[error("question `{0}` would collide with gild's own `--{1}` flag")]
+    ReservedId(String, String),
+    #[error("questions `{0}` and `{1}` would both become `--{2}`")]
+    FlagCollision(String, String, String),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -135,8 +145,34 @@ impl GildFileSparse {
             }
         }
 
+        validate_flags(&resolved)?;
+
         Ok(resolved)
     }
+}
+
+fn validate_flags(questions: &[Question]) -> Result<(), QuestionError> {
+    let mut taken: Vec<(String, &str)> = Vec::new();
+
+    for question in questions {
+        let name = flag(&question.id);
+
+        if RESERVED_FLAGS.contains(&name.as_str()) {
+            return Err(QuestionError::ReservedId(question.id.clone(), name));
+        }
+
+        if let Some((_, owner)) = taken.iter().find(|(taken, _)| *taken == name) {
+            return Err(QuestionError::FlagCollision(
+                (*owner).to_owned(),
+                question.id.clone(),
+                name,
+            ));
+        }
+
+        taken.push((name, &question.id));
+    }
+
+    Ok(())
 }
 
 fn default_changefile_directory() -> String {
