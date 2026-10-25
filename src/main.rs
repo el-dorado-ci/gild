@@ -1,9 +1,12 @@
 mod commands;
 mod env;
+mod forge;
+mod git;
 mod parser;
 mod prompt;
 mod schema;
 mod utils;
+mod version;
 mod words;
 
 use std::error::Error;

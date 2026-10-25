@@ -116,14 +116,17 @@ pub struct GildFileSparse {
     pub artifact_name: String,
     #[serde(default = "default_changefile_directory")]
     pub changefile_directory: String,
+    #[serde(default = "default_changelog_path")]
+    pub changelog_path: String,
     #[serde(default)]
     pub questions: Vec<QuestionSparse>,
     #[serde(default)]
     pub queries: BTreeMap<String, String>,
-    #[allow(dead_code)]
+    pub forge: Option<String>,
+    #[serde(default)]
+    pub forge_api: bool,
     pub version_source: VersionLocation,
     #[serde(default)]
-    #[allow(dead_code)]
     pub version_targets: Vec<VersionLocation>,
 }
 
@@ -177,6 +180,10 @@ fn validate_flags(questions: &[Question]) -> Result<(), QuestionError> {
 
 fn default_changefile_directory() -> String {
     ".gild".to_owned()
+}
+
+fn default_changelog_path() -> String {
+    "CHANGELOG.md".to_owned()
 }
 
 #[derive(Debug, Clone, Deserialize)]
