@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: tag and publish
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'gild/release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.EL_DORADO_PR_BOT_APP_ID }}
+          private-key: ${{ secrets.EL_DORADO_PR_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Enter the dev shell
+        run: nix develop --command true
+
+      - name: Cache cargo and build output
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build gild
+        run: nix develop --command cargo build --release
+
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # The changefiles are already consumed, so `gild version` reports the
+          # version that was just released rather than a pending bump.
+          version="$(./target/release/gild version)"
+
+          if gh release view "v${version}" > /dev/null 2>&1; then
+            echo "v${version} already released."
+            exit 0
+          fi
+
+          # The newest section of the changelog, up to the next release heading.
+          awk '/^## /{if (seen++) exit} seen' CHANGELOG.md > "${RUNNER_TEMP}/notes.md"
+
+          gh release create "v${version}" \
+            --target main \
+            --title "v${version}" \
+            --notes-file "${RUNNER_TEMP}/notes.md"

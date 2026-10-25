@@ -11,6 +11,11 @@ type = "regex"
 path = "Cargo.toml"
 pattern = '^version = "(.+)"$'
 
+[[package.metadata.gild.version_targets]]
+type = "regex"
+path = "Cargo.toml"
+pattern = '^version = "(.+)"$'
+
 [package.metadata.gild.queries]
 major_changes = "contains([*bump_type], 'major')"
 minor_changes = "contains([*bump_type], 'minor')"
