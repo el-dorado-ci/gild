@@ -1,0 +1,96 @@
+name: Release PR
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHANGEFILES: .gild
+
+jobs:
+  release-pr:
+    name: open or update gild/release
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.EL_DORADO_PR_BOT_APP_ID }}
+          private-key: ${{ secrets.EL_DORADO_PR_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check for pending changefiles
+        id: pending
+        run: |
+          if [ -n "$(find "$CHANGEFILES" -name '*.yaml' -type f 2>/dev/null)" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No changefiles pending; nothing to release."
+          fi
+
+      - uses: cachix/install-nix-action@v31
+        if: steps.pending.outputs.found == 'true'
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Enter the dev shell
+        if: steps.pending.outputs.found == 'true'
+        run: nix develop --command true
+
+      - name: Cache cargo and build output
+        if: steps.pending.outputs.found == 'true'
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build gild
+        if: steps.pending.outputs.found == 'true'
+        run: nix develop --command cargo build --release
+
+      - name: Apply the release
+        id: release
+        if: steps.pending.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          version="$(./target/release/gild version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          ./target/release/gild generate --online > "${RUNNER_TEMP}/release-notes.md"
+          ./target/release/gild generate --apply --online
+
+          # Bumping the version in Cargo.toml leaves Cargo.lock's own entry
+          # stale, which a --locked build would reject.
+          nix develop --command cargo update --offline --package gild
+
+      - name: Open or update the pull request
+        if: steps.pending.outputs.found == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: gild/release
+          base: main
+          title: Release ${{ steps.release.outputs.version }}
+          body-path: ${{ runner.temp }}/release-notes.md
+          commit-message: Release ${{ steps.release.outputs.version }}
+          delete-branch: true

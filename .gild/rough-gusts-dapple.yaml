@@ -1,0 +1,2 @@
+bump_type: patch
+description: Hooking into the intended workflow, creating a release PR for creating versions.
