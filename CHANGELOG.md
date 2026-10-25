@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-10-25
+
+### patch
+
+- @kassett: Packaging for Snap, Nix, and Homebrew ([#25](https://github.com/el-dorado-ci/gild/pull/25))
+
 ## 0.2.0 - 2026-10-25
 
 ### minor
