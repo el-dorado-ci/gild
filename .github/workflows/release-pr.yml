@@ -58,7 +58,7 @@ jobs:
             echo "No changefiles pending; nothing to release."
           fi
 
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@v32
         if: steps.pending.outputs.found == 'true'
         with:
           extra_nix_config: |
